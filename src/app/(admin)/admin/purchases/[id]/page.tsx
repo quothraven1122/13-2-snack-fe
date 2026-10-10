@@ -1,42 +1,43 @@
 'use client';
-import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'next/navigation';
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
+import { useParams, useRouter } from 'next/navigation';
 
 import Button from '@/components/ui/Button/Button';
 import InfoTable from '@/components/ui/Info/InfoTable';
 import PurchaseCardListItem from '@/components/ui/Purchase/PurchaseCardListItem';
 import { statusBadgeMenu } from '@/constants/badgeMenu';
-import * as adminOrderService from '@/lib/services/adminOrderService';
 import { formatDate } from '@/utils/date';
+
+import usePurchase from '../_hooks/usePurchase';
 
 export default function MyOrganizationPurchaseDetail() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const { data, isFetching, isError } = useQuery({
-    queryKey: ['adminOrder', id],
-    queryFn: () => adminOrderService.getAdminOrder(Number(id)),
-  });
+  const { purchaseData, isPending, isError } = usePurchase({ id: Number(id) });
 
   const productPriceTotal =
-    data?.items.reduce((total, item) => total + item.subtotal, 0) ?? 0;
+    purchaseData?.items.reduce((total, item) => total + item.subtotal, 0) ?? 0;
 
-  if (isFetching) return <div>로딩 중...</div>;
-  if (isError) {
-    /*추후 상세 에러 처리 로직 추가 예정*/
-    alert('데이터를 불러오는 중 에러가 났습니다.');
-    router.push('/purchases');
-  }
+  useEffect(() => {
+    if (isError) {
+      /*추후 상세 에러 처리 로직 추가 예정*/
+      alert('데이터를 불러오는 중 에러가 났습니다.');
+      router.push('/admin/purchases');
+    }
+  }, [isError, router]);
 
   return (
     <div className="px-[24px] pb-[24px] lg:w-[1200px] lg:m-auto">
       <h1 className="text-18-bold mb-[30px]">구매 내역 상세</h1>
       <h2 className="text-16-bold text-primary-950 mb-[20px]">
         요청 품목{' '}
-        <span className="text-16-regular">총 {data?.items.length}개</span>
+        <span className="text-16-regular">
+          총 {purchaseData?.items.length}개
+        </span>
       </h2>
       <div className="pt-[20px] pb-[30px] px-[20px] shadow-[0_0_6px_0_rgba(0,0,0,0.1)]">
-        {data?.items.map((item) => (
+        {purchaseData?.items.map((item) => (
           <PurchaseCardListItem
             key={item.productId}
             imageSrc={item.imageUrl}
@@ -69,11 +70,14 @@ export default function MyOrganizationPurchaseDetail() {
             </h2>
           }
           data={[
-            { label: '요청인', value: data?.requester.name },
-            { label: '요청 날짜', value: formatDate(data?.createdAt ?? '') },
+            { label: '요청인', value: purchaseData?.requester.name },
+            {
+              label: '요청 날짜',
+              value: formatDate(purchaseData?.createdAt ?? ''),
+            },
             {
               label: '요청 메시지',
-              value: data?.requestMessage,
+              value: purchaseData?.requestMessage,
 
               fullWidth: true,
             },
@@ -88,20 +92,21 @@ export default function MyOrganizationPurchaseDetail() {
           data={[
             {
               label: '담당자',
-              value: data?.handler?.name ?? '',
+              value: purchaseData?.handler?.name ?? '',
             },
             {
               label: '승인 날짜',
-              value: formatDate(data?.updatedAt ?? ''),
+              value: formatDate(purchaseData?.updatedAt ?? ''),
             },
             {
               label: '상태',
-              value: statusBadgeMenu.find((menu) => menu.label === data?.status)
-                ?.name,
+              value: statusBadgeMenu.find(
+                (menu) => menu.label === purchaseData?.status,
+              )?.name,
             },
             {
               label: '결과 메세지',
-              value: data?.responseMessage,
+              value: purchaseData?.responseMessage,
             },
           ]}
         />

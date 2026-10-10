@@ -19,7 +19,7 @@ export default function useBudget() {
 
   // 1. budget 관련 데이터 불러오는 query
   const { data, isPending } = useQuery({
-    queryKey: ['budget'],
+    queryKey: ['budget', 'settings'],
     queryFn: () => budgetService.getBudgetSettings(),
   });
   useEffect(() => {
