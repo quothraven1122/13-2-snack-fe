@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { useQueryClient } from '@tanstack/react-query';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { CheckIcon } from '@/components/icons';
 import * as budgetService from '@/lib/services/budgetService';

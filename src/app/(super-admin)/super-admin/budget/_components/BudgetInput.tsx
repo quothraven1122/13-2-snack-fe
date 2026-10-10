@@ -31,7 +31,7 @@ export default function BudgetInput({
           onChange={(e) => {
             setBudget(e.target.value);
           }}
-          className="flex-1 text-30-bold text-primary-950 placeholder:text-primary-200 focus:outline-none"
+          className="flex-1 min-w-0 text-30-bold text-primary-950 placeholder:text-primary-200 focus:outline-none"
         />
         <p className="text-30-bold text-primary-950">원</p>
       </div>
