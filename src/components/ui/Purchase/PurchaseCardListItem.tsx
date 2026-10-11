@@ -35,6 +35,7 @@ export default function PurchaseCardListItem({
           src={NoImage}
           alt="상품 이미지 없음"
           className="w-[140px] h-[140px]"
+          priority={priority}
         />
       ) : (
         <ProductImage
