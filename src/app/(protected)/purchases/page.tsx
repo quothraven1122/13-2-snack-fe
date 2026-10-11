@@ -7,7 +7,6 @@ import DropdownButton from '@/components/ui/Dropdown/DropdownButton';
 import DropdownItem from '@/components/ui/Dropdown/DropdownItem';
 import EmptyProductState from '@/components/ui/EmptyProductState/EmptyProductState';
 import Pagination from '@/components/ui/List/Pagination';
-import { DeleteConfirmModal } from '@/components/ui/Modal';
 import {
   PurchaseListItem,
   PurchaseListItemMobile,
@@ -15,13 +14,12 @@ import {
 import { sortMenu } from '@/constants/dropdownMenu';
 import { useScreenSize } from '@/hooks/common/useScreenSize';
 import type { MyOrderSort } from '@/lib/services/orderService';
-import { useModal } from '@/providers/ModalProvider';
 
+import useCancelPurchaseModal from './_hooks/useCancelPurchaseModal';
 import usePurchases from './_hooks/usePurchases';
 
 export default function MyPurchasesPage() {
   const router = useRouter();
-  const { openModal, closeModal } = useModal();
 
   const [sort, setSort] = useState<MyOrderSort>('');
   const [page, setPage] = useState(1);
@@ -32,26 +30,7 @@ export default function MyPurchasesPage() {
     page,
     screenSize,
   });
-
-  const openCancelModal = (
-    item: NonNullable<typeof purchaseDataList>['items'][number],
-  ) => {
-    const targetName =
-      item.totalItemCount > 1
-        ? `${item.representativeProductName} 외 ${item.totalItemCount - 1}건`
-        : item.representativeProductName;
-
-    openModal(
-      <DeleteConfirmModal
-        variant="purchaseRequest"
-        targetName={targetName}
-        onConfirm={() => {
-          cancelOrder(item.id);
-          closeModal();
-        }}
-      />,
-    );
-  };
+  const openCancelModal = useCancelPurchaseModal({ onCancel: cancelOrder });
 
   if (purchaseDataList?.items.length === 0) {
     return <EmptyProductState />;
