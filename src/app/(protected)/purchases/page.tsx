@@ -1,107 +1,43 @@
-'use client';
-import { useState } from 'react';
-
-import { useRouter } from 'next/navigation';
-
-import DropdownButton from '@/components/ui/Dropdown/DropdownButton';
-import DropdownItem from '@/components/ui/Dropdown/DropdownItem';
-import EmptyProductState from '@/components/ui/EmptyProductState/EmptyProductState';
-import Pagination from '@/components/ui/List/Pagination';
 import {
-  PurchaseListItem,
-  PurchaseListItemMobile,
-} from '@/components/ui/Purchase/PurchaseListItem';
-import { sortMenu } from '@/constants/dropdownMenu';
-import { useScreenSize } from '@/hooks/common/useScreenSize';
-import type { MyOrderSort } from '@/lib/services/orderService';
+  HydrationBoundary,
+  QueryClient,
+  dehydrate,
+} from '@tanstack/react-query';
+import { cookies } from 'next/headers';
 
-import useCancelPurchaseModal from './_hooks/useCancelPurchaseModal';
-import usePurchases from './_hooks/usePurchases';
+import { getMyOrdersOnServer } from '@/lib/services/orderService';
 
-export default function MyPurchasesPage() {
-  const router = useRouter();
+import PurchasesView from './_components/PurchasesView';
+import { getMyOrdersLimit, myOrdersQueryKey } from './_hooks/usePurchases';
 
-  const [sort, setSort] = useState<MyOrderSort>('');
-  const [page, setPage] = useState(1);
-  const screenSize = useScreenSize();
+// 화면이 처음 그려질 때의 정렬·페이지. PurchasesView의 useState 초기값과 같아야 한다.
+const INITIAL_SORT = '';
+const INITIAL_PAGE = 1;
+// 서버는 화면 크기를 모른다. useScreenSize의 초기값이 'mobile'이라
+// 브라우저의 첫 렌더링도 mobile 개수로 조회하므로, 같은 개수로 받아야 캐시를 이어받는다.
+const INITIAL_LIMIT = getMyOrdersLimit('mobile');
 
-  const { isPending, purchaseDataList, cancelOrder } = usePurchases({
-    sort,
-    page,
-    screenSize,
-  });
-  const openCancelModal = useCancelPurchaseModal({ onCancel: cancelOrder });
+// 첫 페이지를 서버에서 받아 HTML에 담는다. (자세한 이유는 orderService.getMyOrdersOnServer)
+// PurchasesView는 같은 쿼리 키로 이 데이터를 이어받아 첫 요청을 다시 하지 않는다.
+export default async function PurchasesPage() {
+  const cookieStore = await cookies();
+  const queryClient = new QueryClient();
+  const firstPage = await getMyOrdersOnServer(
+    { sort: INITIAL_SORT, page: INITIAL_PAGE, limit: INITIAL_LIMIT },
+    cookieStore.toString(),
+  );
 
-  if (purchaseDataList?.items.length === 0) {
-    return <EmptyProductState />;
+  // 실패하면 비워 둔다. 화면이 기존처럼 브라우저에서 받는다.
+  if (firstPage) {
+    queryClient.setQueryData(
+      myOrdersQueryKey(INITIAL_SORT, INITIAL_PAGE, INITIAL_LIMIT),
+      firstPage,
+    );
   }
 
   return (
-    <div className="w-[80%] m-auto pb-[20px]">
-      <div className="w-full flex justify-between items-center text-18-bold mb-[40px]">
-        <h1>구매 요청 내역</h1>
-        <DropdownButton
-          value={sort}
-          onChange={(value) => setSort(value as MyOrderSort)}
-          placeholder="정렬"
-          listClassName="border border-primary-100"
-          containerClassName="border border-primary-100 text-16-regular"
-          className="border-0"
-        >
-          {sortMenu.map(({ label, name }) => (
-            <DropdownItem
-              key={label}
-              value={label}
-              className="text-center justify-center text-16-regular"
-            >
-              {name}
-            </DropdownItem>
-          ))}
-        </DropdownButton>
-      </div>
-      {screenSize === 'desktop' && (
-        <div className="w-full h-[60px] pl-[40px] border-y border-primary-100 grid grid-cols-5 flex items-center text-16-bold text-primary-500">
-          <p>구매 요청일</p>
-          <p>상품 정보</p>
-          <p>주문 금액</p>
-          <p>상태</p>
-          <p>비고</p>
-        </div>
-      )}
-      {purchaseDataList?.items !== undefined &&
-        (screenSize !== 'desktop'
-          ? purchaseDataList.items.map((item) => (
-              <PurchaseListItemMobile
-                key={item.id}
-                date={item.createdAt}
-                product={item.representativeProductName}
-                totalItemCount={item.totalItemCount}
-                price={item.totalPrice}
-                status={item.status}
-                onClick={() => router.push(`/purchases/${item.id}`)}
-                onCancel={() => openCancelModal(item)}
-              />
-            ))
-          : purchaseDataList.items.map((item) => (
-              <PurchaseListItem
-                key={item.id}
-                date={item.createdAt}
-                product={item.representativeProductName}
-                totalItemCount={item.totalItemCount}
-                price={item.totalPrice}
-                status={item.status}
-                onClick={() => router.push(`/purchases/${item.id}`)}
-                onCancel={() => openCancelModal(item)}
-              />
-            )))}
-      {purchaseDataList?.totalPages !== undefined && (
-        <Pagination
-          currentPage={page}
-          totalPages={purchaseDataList.totalPages}
-          onPageChange={setPage}
-          className="mt-[30px]"
-        />
-      )}
-    </div>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <PurchasesView />
+    </HydrationBoundary>
   );
 }
