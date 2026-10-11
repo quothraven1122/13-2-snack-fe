@@ -1,8 +1,6 @@
 'use client';
 import { useState } from 'react';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 
 import DropdownButton from '@/components/ui/Dropdown/DropdownButton';
@@ -16,35 +14,28 @@ import {
 } from '@/components/ui/Purchase/PurchaseListItem';
 import { sortMenu } from '@/constants/dropdownMenu';
 import { useScreenSize } from '@/hooks/common/useScreenSize';
-import * as orderService from '@/lib/services/orderService';
 import type { MyOrderSort } from '@/lib/services/orderService';
 import { useModal } from '@/providers/ModalProvider';
 
+import usePurchases from './_hooks/usePurchases';
+
 export default function MyPurchasesPage() {
-  const queryClient = useQueryClient();
   const router = useRouter();
   const { openModal, closeModal } = useModal();
 
   const [sort, setSort] = useState<MyOrderSort>('');
   const [page, setPage] = useState(1);
   const screenSize = useScreenSize();
-  const limit = screenSize === 'desktop' ? 6 : screenSize === 'tablet' ? 8 : 3;
 
-  const { data, isFetching } = useQuery({
-    queryKey: ['myOrders', sort, page, limit],
-    queryFn: () => orderService.getMyOrders({ sort, page, limit }),
-    enabled: !!screenSize,
-  });
-  const mutation = useMutation({
-    mutationFn: (id: number) => orderService.cancelMyOrder(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['myOrders'],
-      });
-    },
+  const { isPending, purchaseDataList, cancelOrder } = usePurchases({
+    sort,
+    page,
+    screenSize,
   });
 
-  const openCancelModal = (item: NonNullable<typeof data>['items'][number]) => {
+  const openCancelModal = (
+    item: NonNullable<typeof purchaseDataList>['items'][number],
+  ) => {
     const targetName =
       item.totalItemCount > 1
         ? `${item.representativeProductName} 외 ${item.totalItemCount - 1}건`
@@ -55,16 +46,14 @@ export default function MyPurchasesPage() {
         variant="purchaseRequest"
         targetName={targetName}
         onConfirm={() => {
-          mutation.mutate(item.id);
+          cancelOrder(item.id);
           closeModal();
         }}
       />,
     );
   };
 
-  if (isFetching) return <div>로딩 중...</div>;
-
-  if (data?.items.length === 0) {
+  if (purchaseDataList?.items.length === 0) {
     return <EmptyProductState />;
   }
 
@@ -100,9 +89,9 @@ export default function MyPurchasesPage() {
           <p>비고</p>
         </div>
       )}
-      {data?.items !== undefined &&
+      {purchaseDataList?.items !== undefined &&
         (screenSize !== 'desktop'
-          ? data.items.map((item) => (
+          ? purchaseDataList.items.map((item) => (
               <PurchaseListItemMobile
                 key={item.id}
                 date={item.createdAt}
@@ -114,7 +103,7 @@ export default function MyPurchasesPage() {
                 onCancel={() => openCancelModal(item)}
               />
             ))
-          : data.items.map((item) => (
+          : purchaseDataList.items.map((item) => (
               <PurchaseListItem
                 key={item.id}
                 date={item.createdAt}
@@ -126,10 +115,10 @@ export default function MyPurchasesPage() {
                 onCancel={() => openCancelModal(item)}
               />
             )))}
-      {data?.totalPages !== undefined && (
+      {purchaseDataList?.totalPages !== undefined && (
         <Pagination
           currentPage={page}
-          totalPages={data.totalPages}
+          totalPages={purchaseDataList.totalPages}
           onPageChange={setPage}
           className="mt-[30px]"
         />
