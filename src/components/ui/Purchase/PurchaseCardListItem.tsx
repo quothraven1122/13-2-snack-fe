@@ -14,6 +14,8 @@ type PurchaseCardListItemProps = {
   className?: string;
   imageClassName?: string;
   likeButtonClassName?: string;
+  /** 첫 화면에 보이는 카드에만 true. 목록 전체에 주면 대역폭만 나눠 먹는다. */
+  priority?: boolean;
 };
 
 const PRODUCT_CARD_IMAGE_SIZE = 340;
@@ -24,6 +26,7 @@ export default function PurchaseCardListItem({
   name,
   price,
   purchaseCount,
+  priority = false,
 }: PurchaseCardListItemProps) {
   return (
     <div className="flex gap-[20px] p-[20px] pl-0 border-b border-primary-100">
@@ -32,6 +35,7 @@ export default function PurchaseCardListItem({
           src={NoImage}
           alt="상품 이미지 없음"
           className="w-[140px] h-[140px]"
+          priority={priority}
         />
       ) : (
         <ProductImage
@@ -40,6 +44,7 @@ export default function PurchaseCardListItem({
           size={PRODUCT_CARD_IMAGE_SIZE}
           background="bg-primary-50"
           className="w-[140px] h-[140px]"
+          priority={priority}
         />
       )}
       <div className="flex flex-1 justify-between items-center">

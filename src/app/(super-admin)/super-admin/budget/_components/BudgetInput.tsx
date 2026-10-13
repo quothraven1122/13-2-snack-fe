@@ -6,6 +6,7 @@ type BudgetInputType = {
   title: string;
   budget: string;
   setBudget: (budget: string) => void;
+  isPending?: boolean;
   className?: string;
 };
 
@@ -13,6 +14,7 @@ export default function BudgetInput({
   title,
   budget,
   setBudget,
+  isPending,
   className,
 }: BudgetInputType) {
   const result = budgetSchema.safeParse(budget);
@@ -25,10 +27,11 @@ export default function BudgetInput({
         <input
           value={budget}
           placeholder="예산을 입력해주세요"
+          disabled={isPending}
           onChange={(e) => {
             setBudget(e.target.value);
           }}
-          className="flex-1 text-30-bold text-primary-950 placeholder:text-primary-200 focus:outline-none"
+          className="flex-1 min-w-0 text-30-bold text-primary-950 placeholder:text-primary-200 focus:outline-none"
         />
         <p className="text-30-bold text-primary-950">원</p>
       </div>

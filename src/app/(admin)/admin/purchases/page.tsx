@@ -1,157 +1,55 @@
 'use client';
-import { ReactNode, useState } from 'react';
+import { useState } from 'react';
 
-
-
-import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 
-
-
 import Badge from '@/components/ui/Badge/Badge';
-import DropdownButton from '@/components/ui/Dropdown/DropdownButton';
-import DropdownItem from '@/components/ui/Dropdown/DropdownItem';
 import EmptyProductState from '@/components/ui/EmptyProductState/EmptyProductState';
 import InfoTable from '@/components/ui/Info/InfoTable';
 import Pagination from '@/components/ui/List/Pagination';
 import ProgressBar from '@/components/ui/ProgressBar/ProgressBar';
 import { ApprovedPurchaseList } from '@/components/ui/Purchase/PurchaseListItem';
-import { sortMenu } from '@/constants/dropdownMenu';
 import { useScreenSize } from '@/hooks/common/useScreenSize';
 import * as adminOrderService from '@/lib/services/adminOrderService';
-import * as budgetService from '@/lib/services/budgetService';
-import { cn } from '@/utils/cn';
 import { formatDate } from '@/utils/date';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-type MyOrganizationBudgetCardProps = {
-  title: string;
-  budget: number;
-  text: string;
-  suffix?: ReactNode;
-  tooltip?: ReactNode;
-  className?: string;
-};
-function MyOrganizationBudgetCard({
-  title,
-  budget,
-  text,
-  suffix,
-  tooltip,
-  className,
-}: MyOrganizationBudgetCardProps) {
-  return (
-    <div
-      className={cn(
-        'relative group min-h-[150px] p-[30px] bg-primary-50 rounded-[4px]',
-        className,
-      )}
-    >
-      <h1 className="flex flex-col gap-[10px] justify-between mb-[17px] lg:flex-row">
-        <p className="text-18-bold">{title}</p>
-        <p className="text-24-extrabold">{budget.toLocaleString()}원</p>
-      </h1>
-      <p className="text-16-regular text-primary-600 whitespace-pre-line">
-        {text}
-      </p>
-      {suffix}
-      {tooltip && (
-        <div className="absolute left-[10%] top-[90%] z-20 hidden group-hover:block w-full max-w-[320px] p-[20px] bg-primary-950 text-white rounded-[12px] pointer-events-none ">
-          {tooltip}
-        </div>
-      )}
-    </div>
-  );
-}
+import OrganizationBudgetCard from './_components/OrganizationBudgetCard';
+import PurchaseHeader from './_components/PurchaseHeader';
+import usePurchases from './_hooks/usePurchases';
 
 export default function MyOrganizationPurchasesManagement() {
   const router = useRouter();
+  const screenSize = useScreenSize();
 
   const [sort, setSort] = useState<adminOrderService.AdminOrderSort>('latest');
   const [page, setPage] = useState(1);
-  const status = 'APPROVED';
-  const screenSize = useScreenSize();
-  const limit = screenSize === 'desktop' ? 4 : 3;
+  const { orderData, budgetData, isPending } = usePurchases({
+    sort,
+    page,
+    screenSize,
+  });
 
-  const { data: orderData } = useQuery({
-    queryKey: ['adminOrders', sort, page, limit],
-    queryFn: () =>
-      adminOrderService.getAdminOrders({
-        sort,
-        page,
-        limit,
-        status,
-      }),
-  });
-  const { data: budgetData } = useQuery({
-    queryKey: ['budget'],
-    queryFn: () => budgetService.getBudgetSummary(),
-  });
   const currentMonthBudget = budgetData?.currentMonthBudget;
   const previousMonthBudget = budgetData?.previousMonthBudget;
 
-  const PurchaseHeader = (
-    <div className="w-full flex justify-between items-center text-18-bold mb-[40px]">
-      <h1>구매 내역 확인</h1>
-
-      <DropdownButton
-        value={sort}
-        onChange={(value) => setSort(value as adminOrderService.AdminOrderSort)}
-        placeholder="정렬"
-        listClassName="border border-primary-100"
-        containerClassName="border border-primary-100 text-16-regular"
-        className="border-0"
-      >
-        {sortMenu.map(({ label, name }) => (
-          <DropdownItem
-            key={label}
-            value={label}
-            className="text-center justify-center text-16-regular"
-          >
-            {name}
-          </DropdownItem>
-        ))}
-      </DropdownButton>
-    </div>
-  );
-
   if (orderData?.items.length === 0) {
-    return <EmptyProductState prefix={PurchaseHeader} />;
+    return (
+      <EmptyProductState
+        prefix={<PurchaseHeader sort={sort} setSort={setSort} />}
+      />
+    );
   }
 
   return (
     <div className="p-[24px] lg:w-[1400px] lg:m-auto">
-      {PurchaseHeader}
+      <PurchaseHeader sort={sort} setSort={setSort} />
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 mb-[40px]">
-        <MyOrganizationBudgetCard
+        <OrganizationBudgetCard
           title="이번 달 예산"
           budget={currentMonthBudget?.startingBudget ?? 0}
           text={`지난 달 예산은 \n ${(previousMonthBudget?.startingBudget ?? 0).toLocaleString()}원이었어요`}
         />
-        <MyOrganizationBudgetCard
+        <OrganizationBudgetCard
           title="이번 달 지출액"
           budget={currentMonthBudget?.spentAmount ?? 0}
           text={`지난 달: ${(previousMonthBudget?.spentAmount ?? 0).toLocaleString()}원`}
@@ -200,7 +98,7 @@ export default function MyOrganizationPurchasesManagement() {
             </div>
           }
         />
-        <MyOrganizationBudgetCard
+        <OrganizationBudgetCard
           title="올해 총 지출액"
           budget={budgetData?.currentYearSpending ?? 0}
           text={`올해 작년보다\n ${((budgetData?.currentYearSpending ?? 0) - (budgetData?.previousYearSpending ?? 0)).toLocaleString()}원 더 지출했어요`}

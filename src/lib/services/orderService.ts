@@ -143,10 +143,8 @@ export type CancelMyOrderResponse = {
   status: 'CANCELED';
 };
 
-//GET /me/orders
-export async function getMyOrders(
-  params?: GetMyOrdersParams,
-): Promise<MyOrdersResponse> {
+// 브라우저 조회(getMyOrders)와 서버 조회(getMyOrdersOnServer)가 같은 주소를 만들도록 한곳에서 만든다.
+function toMyOrdersPath(params?: GetMyOrdersParams): string {
   const searchParams = new URLSearchParams();
 
   if (params?.sort) {
@@ -163,12 +161,74 @@ export async function getMyOrders(
 
   const query = searchParams.toString();
 
-  return fetchClient<MyOrdersResponse>(`/me/orders${query ? `?${query}` : ''}`);
+  return `/me/orders${query ? `?${query}` : ''}`;
+}
+
+//GET /me/orders
+export async function getMyOrders(
+  params?: GetMyOrdersParams,
+): Promise<MyOrdersResponse> {
+  return fetchClient<MyOrdersResponse>(toMyOrdersPath(params));
+}
+
+/*
+@ 서버 조회 (서버 컴포넌트 전용)
+- 서버에서 데이터를 미리 조회해 상품명·이미지가 첫 HTML에 담기도록 해 LCP를 개선한다.
+- 서버에서 직접 쿠키를 전달해 요청하며, 실패 시 null을 반환해 기존 클라이언트 조회로 대체한다.
+- 이 파일은 클라이언트 컴포넌트도 import하므로 next/headers 대신 쿠키 문자열을 인자로 받는다.
+*/
+const SERVER_FETCH_TIMEOUT_MS = 3000;
+
+async function fetchOnServer<T>(
+  path: string,
+  cookie: string,
+): Promise<T | null> {
+  // next.config의 /api 프록시와 같은 주소. 서버에서만 읽으므로 NEXT_PUBLIC_이 필요 없다.
+  const apiBaseUrl = process.env.API_URL;
+
+  if (!apiBaseUrl) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      headers: { cookie },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const json = (await response.json()) as { data?: T };
+    return json.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getMyOrdersOnServer(
+  params: GetMyOrdersParams,
+  cookie: string,
+): Promise<MyOrdersResponse | null> {
+  return fetchOnServer<MyOrdersResponse>(toMyOrdersPath(params), cookie);
 }
 
 // GET /me/orders/:id
 export async function getMyOrder(id: number): Promise<MyOrderDetail> {
   return fetchClient<MyOrderDetail>(`/me/orders/${id}`);
+}
+
+export async function getMyOrderOnServer(
+  id: number,
+  cookie: string,
+): Promise<MyOrderDetail | null> {
+  if (!Number.isInteger(id)) {
+    return null;
+  }
+
+  return fetchOnServer<MyOrderDetail>(`/me/orders/${id}`, cookie);
 }
 
 //DELETE /me/orders/:id

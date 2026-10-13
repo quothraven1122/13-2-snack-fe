@@ -1,150 +1,39 @@
-'use client';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'next/navigation';
-import { useRouter } from 'next/navigation';
+import {
+  HydrationBoundary,
+  QueryClient,
+  dehydrate,
+} from '@tanstack/react-query';
+import { cookies } from 'next/headers';
 
-import Button from '@/components/ui/Button/Button';
-import InfoTable from '@/components/ui/Info/InfoTable';
-import PurchaseCardListItem from '@/components/ui/Purchase/PurchaseCardListItem';
-import { statusBadgeMenu } from '@/constants/badgeMenu';
-import * as cartService from '@/lib/services/cartService';
-import * as orderService from '@/lib/services/orderService';
-import { formatDate } from '@/utils/date';
+import { getMyOrderOnServer } from '@/lib/services/orderService';
 
-export default function MyPurchaseDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-  const queryClient = useQueryClient();
+import PurchaseDetailView from '../_components/PurchaseDetailView';
+import { myOrderQueryKey } from '../_hooks/usePurchase';
 
-  const { data, isFetching, isError } = useQuery({
-    queryKey: ['myOrder', id],
-    queryFn: () => orderService.getMyOrder(Number(id)),
-  });
-  const mutation = useMutation({
-    mutationFn: ({
-      productId,
-      quantity,
-    }: {
-      productId: number;
-      quantity: number;
-    }) => cartService.addCartItem({ productId, quantity }),
-  });
+type PurchaseDetailPageProps = {
+  params: Promise<{ id: string }>;
+};
 
-  const productPriceTotal =
-    data?.items.reduce((total, item) => total + item.subtotal, 0) ?? 0;
+// 상세를 서버에서 받아 HTML에 담는다. (자세한 이유는 orderService의 서버 조회 주석)
+// PurchaseDetailView는 같은 쿼리 키로 이 데이터를 이어받아 첫 요청을 다시 하지 않는다.
+export default async function PurchaseDetailPage({
+  params,
+}: PurchaseDetailPageProps) {
+  const { id } = await params;
+  const purchaseId = Number(id);
 
-  if (isFetching) return <div>로딩 중...</div>;
-  if (isError) {
-    /*추후 상세 에러 처리 로직 추가 예정*/
-    alert('데이터를 불러오는 중 에러가 났습니다.');
-    router.push('/purchases');
+  const cookieStore = await cookies();
+  const queryClient = new QueryClient();
+  const purchase = await getMyOrderOnServer(purchaseId, cookieStore.toString());
+
+  // 실패하면 비워 둔다. 화면이 기존처럼 브라우저에서 받는다.
+  if (purchase) {
+    queryClient.setQueryData(myOrderQueryKey(purchaseId), purchase);
   }
-  return (
-    <div className="px-[24px] pb-[24px] lg:w-[1200px] lg:m-auto">
-      <h1 className="text-18-bold mb-[30px]">구매 요청 내역</h1>
-      <h2 className="text-16-bold text-primary-950 mb-[20px]">
-        요청 품목{' '}
-        <span className="text-16-regular">총 {data?.items.length}개</span>
-      </h2>
-      <div className="pt-[20px] pb-[30px] px-[20px] shadow-[0_0_6px_0_rgba(0,0,0,0.1)]">
-        {data?.items.map((item) => (
-          <PurchaseCardListItem
-            key={item.productId}
-            imageSrc={item.imageUrl}
-            imageAlt={`${item.productName} 사진`}
-            name={item.productName}
-            price={item.priceAtOrder}
-            purchaseCount={item.quantity}
-          />
-        ))}
-        <div className="flex flex-col mt-[20px] gap-[10px]">
-          <div className="flex justify-between text-16-bold text-primary-700">
-            <p>주문금액</p>
-            <p>{productPriceTotal.toLocaleString()}원</p>
-          </div>
-          <div className="flex justify-between text-16-bold text-primary-700">
-            <p>배송비</p>
-            <p>3,000원</p>
-          </div>
-          <div className="flex justify-between text-18-bold text-primary-950 mt-[10px]">
-            <p>총 주문금액</p>
-            <p>{(productPriceTotal + 3000).toLocaleString()}원</p>
-          </div>
-        </div>
-      </div>
-      <div className="w-full mt-[30px]">
-        <InfoTable
-          title={
-            <h2 className="px-[8px] pb-[14px] text-16-extrabold text-primary-950">
-              요청 정보
-            </h2>
-          }
-          data={[
-            { label: '요청인', value: data?.requester.name },
-            { label: '요청 날짜', value: formatDate(data?.createdAt ?? '') },
-            {
-              label: '요청 메시지',
-              value: data?.requestMessage,
 
-              fullWidth: true,
-            },
-          ]}
-        />
-        {data?.handler !== null && (
-          <InfoTable
-            title={
-              <h2 className="px-[8px] pb-[14px] text-16-extrabold text-primary-950">
-                승인 정보
-              </h2>
-            }
-            data={[
-              { label: '담당자', value: data?.handler.name },
-              { label: '승인 날짜', value: formatDate(data?.updatedAt ?? '') },
-              {
-                label: '상태',
-                value: statusBadgeMenu.find(
-                  (menu) => menu.label === data?.status,
-                )?.name,
-              },
-              {
-                label: '결과 메세지',
-                value: data?.responseMessage,
-              },
-            ]}
-          />
-        )}
-      </div>
-      <div className="flex gap-[20px] mt-[44px]">
-        <Button
-          text="목록 보기"
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            router.push('/purchases');
-          }}
-        />
-        <Button
-          text="장바구니에 다시 담기"
-          type="button"
-          variant="primary"
-          onClick={async () => {
-            if (!data?.items) return;
-            await Promise.all(
-              data.items.map((item) =>
-                mutation.mutateAsync({
-                  productId: item.productId,
-                  quantity: item.quantity,
-                }),
-              ),
-            );
-            await queryClient.invalidateQueries({
-              queryKey: ['cartItems'],
-            });
-            router.push('/cart');
-          }}
-        />
-      </div>
-    </div>
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <PurchaseDetailView id={purchaseId} />
+    </HydrationBoundary>
   );
 }

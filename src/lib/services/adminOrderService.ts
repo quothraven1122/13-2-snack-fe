@@ -106,6 +106,41 @@ export async function getAdminOrder(
   return fetchClient<AdminOrderDetail>(`/admin/orders/${orderId}`);
 }
 
+/*
+- 서버에서 구매 상세를 미리 조회해 상품 이미지의 다운로드를 앞당겨 LCP를 개선한다.
+- 서버에서 직접 쿠키를 전달해 요청하며, 실패 시 null을 반환해 기존 클라이언트 조회로 대체한다.
+*/
+const SERVER_FETCH_TIMEOUT_MS = 3000;
+
+export async function getAdminOrderOnServer(
+  orderId: number,
+  cookie: string,
+): Promise<AdminOrderDetail | null> {
+  // next.config의 /api 프록시와 같은 주소. 서버에서만 읽으므로 NEXT_PUBLIC_이 필요 없다.
+  const apiBaseUrl = process.env.API_URL;
+
+  if (!apiBaseUrl || !Number.isInteger(orderId)) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/admin/orders/${orderId}`, {
+      headers: { cookie },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const json = (await response.json()) as { data?: AdminOrderDetail };
+    return json.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function approveAdminOrder(
   orderId: number,
   data: AdminOrderResponseMessage,
